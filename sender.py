@@ -1,4 +1,6 @@
 import logging
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 
 import yaml
@@ -39,8 +41,11 @@ def log_in(conn, username, password):
 
 
 def send_email(conn, sender, receivers, message):
-    logging.info("Attempting to Send Message")
-    conn.sendmail(sender, receivers, message)
+    try:
+        logging.info("Attempting to Send Message")
+        conn.sendmail(sender, receivers, message)
+    except SMTPAuthenticationError as exception:
+        logging.info('Unable to Send Message: %s', exception)
 
 
 if __name__ == "__main__":
@@ -53,6 +58,30 @@ if __name__ == "__main__":
     if not log_in(conn, username, config.get("PASSWORD")):
         exit()
 
-    send_email(conn, username, [username], "This is a test")
+    msg = MIMEMultipart("alternative")
+    msg['Subject'] = "Hello"
+    msg['From'] = username
+    # msg['To'] = [username]
+
+    plain_text = "This is a test"
+    html_text = \
+        """
+        <html>
+            <head></head>
+            <body>
+                <p>
+                    Hey! <br>
+                    Testing email <b>message</b>
+                </p>
+            </body>
+        </html>
+        """
+
+    part1 = MIMEText(plain_text, 'plain')
+    part2 = MIMEText(html_text, 'html')
+    msg.attach(part1)
+    msg.attach(part2)
+
+    send_email(conn, username, [username], msg.as_string())
 
     close_con(conn)
